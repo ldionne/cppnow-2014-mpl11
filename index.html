@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="author", content="Louis Dionne">
+    <title>Template metaprogramming in C++1y</title>
+    <link rel="stylesheet" href="css/reveal.min.css">
+    <link rel="stylesheet" href="css/theme/default.css" id="theme">
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+</head>
+
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <section data-markdown="index.md"
+                     data-separator="^={78}$"
+                     data-vertical="^-{78}$"
+                     data-notes="^Note:"
+            </section
+        </div>
+    </div>
+
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            dependencies: [
+                { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+                { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+                { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+            ]
+        });
+    </script>
+</body>
+
+</html>
