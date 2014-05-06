@@ -24,10 +24,33 @@ Note:
 ## C++1y areas of improvement over C++03
 Note: provide example + benchmarks for each
 
+Note: Explain that in the examples, we're not using lifted metafunctions for
+simplicity, but their utility will be explained. They are useful beyond the
+lack of universal template template parameters in c++03: we can't parse
+lambda expressions if they don't contain type template parameters only
+(IS THAT TRUE?).
+
+TODO: Mark what's available in C++03, C++11 and C++1y
+
+TODO: Explain that for C++03 we're still using variadic templates for the
+non-core part of what's demonstrated. Otherwise, the slides would sometimes
+contain several pages long of preprocessor mess.
+
 ====================
 
 ## Logical operations
 (without short-circuiting)
+
+<!-- TEST CODE
+using true_ = std::true_type;
+using false_ = std::false_type;
+static_assert(and_<>::value, "");
+static_assert(!and_<false_>::value, "");
+static_assert(and_<true_>::value, "");
+static_assert(!and_<true_, false_>::value, "");
+static_assert(and_<true_, true_>::value, "");
+static_assert(!and_<true_, true_, true_, true_, true_, false_>::value, "");
+-->
 
 ----
 
@@ -124,28 +147,291 @@ using and_ = std::is_same<
 
 ----
 
-TODO: Show the benchmarks (we should also show the naive implementation)
+TODO: Show the benchmarks
 
 ====================
 
 ## Metafunction mapping
 
+<!-- TEST CODE
+template <typename x> struct f { struct type; };
+static_assert(std::is_same<map<f, std::tuple<>>::type, std::tuple<>>::value, "");
+static_assert(std::is_same<map<f, std::tuple<int>>::type, std::tuple<f<int>::type>>::value, "");
+static_assert(std::is_same<map<f, std::tuple<int, void>>::type, std::tuple<f<int>::type, f<void>::type>>::value, "");
+-->
+
+----
+
+Naive
+```cpp
+
+```
+TODO
+
+----
+
+"Vectorized" metafunction application
+```cpp
+template <template <typename ...> class f, typename xs>
+struct map;
+
+template <template <typename ...> class f, typename ...xs>
+struct map<f, std::tuple<xs...>> {
+    using type = std::tuple<typename f<xs>::type...>;
+};
+```
+
+----
+
+TODO: Show the benchmarks
+
 ====================
 
-## Associative sequences
+## Key-based lookup
+
+<!-- TEST CODE
+template <int> struct k;
+template <int> struct v;
+static_assert(std::is_same<at_key<k<0>, pair<k<0>, v<0>>>::type, v<0>>::value, "");
+static_assert(std::is_same<at_key<k<0>, pair<k<0>, v<0>>, pair<k<1>, v<1>>>::type, v<0>>::value, "");
+static_assert(std::is_same<at_key<k<1>, pair<k<0>, v<0>>, pair<k<1>, v<1>>>::type, v<1>>::value, "");
+-->
+
+----
+
+In the following slides...
+```cpp
+template <typename x>
+struct no_decay { using type = x; };
+
+template <typename ...xs>
+struct inherit : xs... { };
+
+template <typename key, typename value>
+struct pair { };
+```
+
+----
+
+With single inheritance
+```cpp
+template <typename ...pairs>
+struct map {
+    template <typename fail = void>
+    static typename fail::key_not_found at_key(...);
+};
+
+template <typename key, typename value, typename ...pairs>
+struct map<pair<key, value>, pairs...> : map<pairs...> {
+    using map<pairs...>::at_key;
+    static no_decay<value> at_key(no_decay<key>*);
+};
+
+template <typename key, typename ...pairs>
+using at_key = decltype(
+    map<pairs...>::at_key((no_decay<key>*)nullptr)
+);
+```
+
+----
+
+With multiple inheritance
+```cpp
+template <typename key, typename value>
+static no_decay<value> lookup(pair<key, value>*);
+
+template <typename key, typename ...pairs>
+using at_key = decltype(lookup<key>((inherit<pairs...>*)nullptr));
+```
+
+----
+
+TODO: Show benchmarks
+TODO: There are probably other techniques
 
 ====================
 
-## Sequence indexing
+## Index-based lookup
+
+<!-- TEST CODE
+template <int> struct x;
+static_assert(std::is_same<at<0, x<0>>::type, x<0>>::value, "");
+static_assert(std::is_same<at<0, x<0>, x<1>>::type, x<0>>::value, "");
+static_assert(std::is_same<at<1, x<0>, x<1>>::type, x<1>>::value, "");
+static_assert(std::is_same<at<2, x<0>, x<1>, x<2>>::type, x<2>>::value, "");
+-->
+
+----
+
+In the following slides...
+```cpp
+template <typename x>
+struct no_decay { using type = x; };
+
+template <std::size_t index, typename value>
+struct index_pair { };
+```
+
+----
+
+Naive
+```cpp
+template <std::size_t index, typename x, typename ...xs>
+struct at
+    : at<index - 1, xs...>
+{ };
+
+template <typename x, typename ...xs>
+struct at<0, x, xs...> {
+    using type = x;
+};
+```
+
+----
+
+Using multiple inheritance
+```cpp
+template <std::size_t index, typename value>
+no_decay<value> lookup(index_pair<index, value>*);
+
+template <typename indices, typename ...xs>
+struct index_map;
+
+template <std::size_t ...indices, typename ...xs>
+struct index_map<std::index_sequence<indices...>, xs...>
+    : index_pair<indices, xs>...
+{ };
+
+template <std::size_t index, typename ...xs>
+using at = decltype(lookup<index>(
+    (index_map<std::index_sequence_for<xs...>, xs...>*)nullptr
+));
+```
+
+----
+
+Using overload resolution
+```cpp
+template <typename ignore>
+struct lookup;
+
+template <std::size_t ...ignore>
+struct lookup<std::index_sequence<ignore...>> {
+    template <typename nth>
+    static no_decay<nth>
+    apply(decltype(ignore, (void*)nullptr)..., no_decay<nth>*, ...);
+};
+
+template <std::size_t index, typename ...xs>
+using at = decltype(
+    lookup<std::make_index_sequence<index>>::apply(
+        (no_decay<xs>*)nullptr...
+    )
+);
+```
+
+----
+
+TODO: Show the benchmarks
+TODO: There's another trick by Richard Smith that ought to be tried
+
 
 ====================
 
-## Constexpr folding of homogeneous data
+## Folding
+
+TODO: We study left folds here, but are right folds similar w.r.t.
+C++1y improvement?
+
+Note: Once you win the folds, you win (almost) everything. Explain this.
+
+----
+
+Naive
+```cpp
+template <template <typename ...> class f, typename state, typename xs,
+          bool = is_empty<xs>::value>
+struct foldl {
+    using type = state;
+};
+
+template <template <typename ...> class f, typename state, typename xs>
+struct foldl<f, state, xs, false>
+    : foldl<
+        f,
+        typename f<state, typename head<xs>::type>::type,
+        typename tail<xs>::type
+    >
+{ };
+```
+
+----
+
+Using variadic templates
+```cpp
+template <template <typename ...> class f, typename state, typename ...xs>
+struct foldl {
+    TODO: FINISH THIS
+};
+```
+
+----
+
+Bonus for homogeneous data: `constexpr`
+```cpp
+template <typename F, typename State, typename T, std::size_t N>
+constexpr State foldl_impl(F f, State s, std::array<T, N> const& xs) {
+    for (std::size_t i = 0; i < xs.size(); ++i)
+        s = f(s, xs[i]);
+    return s;
+}
+
+template <template <typename ...> class f, typename state, typename ...xs>
+struct foldl_homogeneous {
+    TODO: FINISH THIS
+    TODO: will it work on arbitrary homogeneous data, or only integrals?
+};
+```
+
+Note: We can't use a range-based for loop here because `std::array` does not
+provide `constexpr` iterators.
+
+----
+
+TODO: Expose benchmarks
 
 ====================
 
-## Universal template template parameters
+## Universal template template params
 (or farewell `quoteN`)
+
+----
+
+C++03
+```cpp
+template <template <typename> class f>
+struct quote1 { ... };
+
+template <template <typename, typename> class f>
+struct quote2 { ... };
+
+...
+
+template <template <typename, typename, ..., typename> class f>
+struct quoteN { ... };
+```
+
+----
+
+C++11
+```cpp
+template <template <typename ...> class f>
+struct quote { ... };
+```
+
+----
+
+TODO: Show usage example and how the code is made simpler.
 
 ====================
 
