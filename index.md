@@ -22,12 +22,109 @@ Note:
 ====================
 
 ## C++1y areas of improvement over C++03
-Note:
-example + benchmarks for each
+Note: provide example + benchmarks for each
 
 ====================
 
 ## Logical operations
+(without short-circuiting)
+
+----
+
+Naive
+```cpp
+template <typename ...xs>
+struct and_
+    : std::true_type
+{ };
+
+template <typename x, typename ...xs>
+struct and_<x, xs...>
+    : std::conditional_t<x::value, and_<xs...>, x>
+{ };
+```
+
+----
+
+With `noexcept`
+```cpp
+void allow_expansion(...) noexcept;
+
+template <bool condition>
+struct noexcept_if { noexcept_if() noexcept(condition) { } };
+
+template <typename ...xs>
+using and_ = std::integral_constant<bool,
+    noexcept(allow_expansion(noexcept_if<xs::value>{}...))
+>;
+```
+
+----
+
+With `constexpr`
+```cpp
+template <std::size_t N>
+constexpr bool and_impl(const bool (&array)[N]) {
+    for (bool elem: array)
+        if (!elem)
+            return false;
+    return true;
+}
+
+template <typename ...xs>
+using and_ = std::integral_constant<bool,
+    and_impl<sizeof...(xs) + 1>({(bool)xs::value..., true})
+>;
+```
+
+----
+
+With overload resolution
+```cpp
+template <typename ...T> std::true_type  pointers_only(T*...);
+template <typename ...T> std::false_type pointers_only(T...);
+                         std::true_type  pointers_only();
+
+template <typename ...xs>
+using and_ = decltype(pointers_only(
+    std::conditional_t<xs::value, int*, int>{}...
+));
+```
+
+----
+
+With partial specialization
+```cpp
+template <typename ...>
+struct and_impl
+    : std::false_type
+{ };
+
+template <typename ...T>
+struct and_impl<std::integral_constant<T, true>...>
+    : std::true_type
+{ };
+
+template <typename ...xs>
+using and_ = and_impl<std::integral_constant<bool, xs::value>...>;
+```
+
+----
+
+With `std::is_same`
+```cpp
+template <bool ...> struct bool_seq;
+
+template <typename ...xs>
+using and_ = std::is_same<
+    bool_seq<xs::value...>,
+    bool_seq<(xs::value, true)...>
+>;
+```
+
+----
+
+TODO: Show the benchmarks (we should also show the naive implementation)
 
 ====================
 
