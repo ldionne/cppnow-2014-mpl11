@@ -1,40 +1,101 @@
-## Template metaprogramming in C++1y
+## Towards painless metaprogramming
 ### Louis Dionne, C++Now 2014
 
 ====================
 
 ## Outline
-- __What__ is metaprogramming in C++?
-- C++1y areas of improvement over C++03
-- My proposal
+- Metaprogramming in C++1y
+- Towards a MPL successor: state of affairs
+
+==============================================================================
+
+# Act 1
+## Metaprogramming in C++1y
 
 ====================
 
-## __What__ is metaprogramming in C++?
+## Boilerplate for this section
+
 Note:
-- State the scope of an eventual MPL reimplementation.
-- Also, observe lack of the word template.
-----
-## What is the purpose of the MPL?
-----
-## of Fusion?
-
-====================
-
-## C++1y areas of improvement over C++03
-Note: provide example + benchmarks for each
-
-Note: Explain that in the examples, we're not using lifted metafunctions for
+Explain that in the examples, we're not using lifted metafunctions for
 simplicity, but their utility will be explained. They are useful beyond the
 lack of universal template template parameters in c++03: we can't parse
 lambda expressions if they don't contain type template parameters only
 (IS THAT TRUE?).
 
-TODO: Mark what's available in C++03, C++11 and C++1y
+----
 
-TODO: Explain that for C++03 we're still using variadic templates for the
-non-core part of what's demonstrated. Otherwise, the slides would sometimes
-contain several pages long of preprocessor mess.
+```cpp
+#include <array>
+#include <cstddef>
+#include <functional>
+#include <type_traits>
+```
+
+----
+
+```cpp
+template <bool v>
+using bool_ = std::integral_constant<bool, v>;
+
+using true_ = bool_<true>;
+using false_ = bool_<false>;
+```
+
+----
+
+```cpp
+template <typename ...xs>
+struct list;
+
+template <typename x, typename xs>
+struct cons;
+
+template <typename x, typename ...xs>
+struct cons<x, list<xs...>> {
+    using type = list<x, xs...>;
+};
+```
+
+----
+
+```cpp
+template <typename xs>
+struct tail;
+
+template <typename x, typename ...xs>
+struct tail<list<x, xs...>> {
+    using type = list<xs...>;
+};
+```
+
+----
+
+```cpp
+template <typename xs>
+struct head;
+
+template <typename x, typename ...xs>
+struct head<list<x, xs...>> {
+    using type = x;
+};
+```
+
+----
+
+```cpp
+template <typename xs>
+struct is_empty;
+
+template <typename ...xs>
+struct is_empty<list<xs...>>
+    : bool_<sizeof...(xs) == 0>
+{ };
+```
+
+Note:
+Explain how this setup with `list` is equivalent to an iterator-based
+setup in the MPL, only simpler.
 
 ====================
 
@@ -42,8 +103,6 @@ contain several pages long of preprocessor mess.
 (without short-circuiting)
 
 <!-- TEST CODE
-using true_ = std::true_type;
-using false_ = std::false_type;
 static_assert(and_<>::value, "");
 static_assert(!and_<false_>::value, "");
 static_assert(and_<true_>::value, "");
@@ -57,9 +116,7 @@ static_assert(!and_<true_, true_, true_, true_, true_, false_>::value, "");
 Naive
 ```cpp
 template <typename ...xs>
-struct and_
-    : std::true_type
-{ };
+struct and_ : true_ { };
 
 template <typename x, typename ...xs>
 struct and_<x, xs...>
@@ -77,7 +134,7 @@ template <bool condition>
 struct noexcept_if { noexcept_if() noexcept(condition) { } };
 
 template <typename ...xs>
-using and_ = std::integral_constant<bool,
+using and_ = bool_<
     noexcept(allow_expansion(noexcept_if<xs::value>{}...))
 >;
 ```
@@ -95,7 +152,7 @@ constexpr bool and_impl(const bool (&array)[N]) {
 }
 
 template <typename ...xs>
-using and_ = std::integral_constant<bool,
+using and_ = bool_<
     and_impl<sizeof...(xs) + 1>({(bool)xs::value..., true})
 >;
 ```
@@ -104,9 +161,9 @@ using and_ = std::integral_constant<bool,
 
 With overload resolution
 ```cpp
-template <typename ...T> std::true_type  pointers_only(T*...);
-template <typename ...T> std::false_type pointers_only(T...);
-                         std::true_type  pointers_only();
+template <typename ...T> true_  pointers_only(T*...);
+template <typename ...T> false_ pointers_only(T...);
+                         true_  pointers_only();
 
 template <typename ...xs>
 using and_ = decltype(pointers_only(
@@ -119,17 +176,13 @@ using and_ = decltype(pointers_only(
 With partial specialization
 ```cpp
 template <typename ...>
-struct and_impl
-    : std::false_type
-{ };
+struct and_impl : false_ { };
 
 template <typename ...T>
-struct and_impl<std::integral_constant<T, true>...>
-    : std::true_type
-{ };
+struct and_impl<std::integral_constant<T, true>...> : true_ { };
 
 template <typename ...xs>
-using and_ = and_impl<std::integral_constant<bool, xs::value>...>;
+using and_ = and_impl<bool_<xs::value>...>;
 ```
 
 ----
@@ -147,7 +200,13 @@ using and_ = std::is_same<
 
 ----
 
-TODO: Show the benchmarks
+## Time
+![](plot/logical_or/clang35.time.png)
+
+----
+
+## Memory usage
+![](plot/logical_or/clang35.memusg.png)
 
 ====================
 
@@ -164,9 +223,20 @@ static_assert(std::is_same<map<f, std::tuple<int, void>>::type, std::tuple<f<int
 
 Naive
 ```cpp
+template <template <typename ...> class f, typename xs,
+          bool = is_empty<xs>::value>
+struct map
+    : cons<
+        typename f<typename head<xs>::type>::type,
+        typename map<f, typename tail<xs>::type>::type
+    >
+{ };
 
+template <template <typename ...> class f, typename xs>
+struct map<f, xs, true> {
+    using type = xs;
+};
 ```
-TODO
 
 ----
 
@@ -176,14 +246,18 @@ template <template <typename ...> class f, typename xs>
 struct map;
 
 template <template <typename ...> class f, typename ...xs>
-struct map<f, std::tuple<xs...>> {
-    using type = std::tuple<typename f<xs>::type...>;
+struct map<f, list<xs...>> {
+    using type = list<typename f<xs>::type...>;
 };
 ```
 
 ----
 
-TODO: Show the benchmarks
+![](plot/fmap.deep/clang35.time.png)
+
+----
+
+![](plot/fmap.deep/clang35.memusg.png)
 
 ====================
 
@@ -246,8 +320,13 @@ using at_key = decltype(lookup<key>((inherit<pairs...>*)nullptr));
 
 ----
 
-TODO: Show benchmarks
-TODO: There are probably other techniques
+## Time
+![](plot/at_key.deep/clang35.time.png)
+
+----
+
+## Memory usage
+![](plot/at_key.deep/clang35.memusg.png)
 
 ====================
 
@@ -332,16 +411,39 @@ using at = decltype(
 
 ----
 
-TODO: Show the benchmarks
-TODO: There's another trick by Richard Smith that ought to be tried
+Using multiple inheritance (v2)
+```cpp
+template <std::size_t, std::size_t, typename x>
+struct select { };
 
+template <std::size_t n, typename x>
+struct select<n, n, x> { using type = x; };
+
+template <std::size_t n, typename indices, typename ...xs>
+struct lookup;
+
+template <std::size_t n, std::size_t ...index, typename ...xs>
+struct lookup<n, std::index_sequence<index...>, xs...>
+    : select<n, index, xs>...
+{ };
+
+template <std::size_t n, typename ...xs>
+using at = lookup<n, std::index_sequence_for<xs...>, xs...>;
+```
+
+----
+
+## Time
+![](plot/at_index.deep/clang35.time.png)
+
+----
+
+## Memory usage
+![](plot/at_index.deep/clang35.memusg.png)
 
 ====================
 
-## Folding
-
-TODO: We study left folds here, but are right folds similar w.r.t.
-C++1y improvement?
+## Left-folding
 
 Note: Once you win the folds, you win (almost) everything. Explain this.
 
@@ -369,28 +471,48 @@ struct foldl<f, state, xs, false>
 
 Using variadic templates
 ```cpp
-template <template <typename ...> class f, typename state, typename ...xs>
+template <bool done> struct foldl_impl {
+    template <template <class ...> class f, class state,
+              class x, class ...xs>
+    using result = typename foldl_impl<sizeof...(xs) == 0>::
+        template result<f, typename f<state, x>::type, xs...>;
+};
+
+template <> struct foldl_impl<true> {
+    template <template <class ...> class f, class state, class ...>
+    using result = state;
+};
+
+template <template <class ...> class f, class state, class ...xs>
 struct foldl {
-    TODO: FINISH THIS
+    using type = typename foldl_impl<sizeof...(xs) == 0>::
+                 template result<f, state, xs...>;
 };
 ```
 
+Note:
+- Observe that this is a general technique of moving the specialization
+outside the alias.
+- In the MPL11, we use this together with unrolling to achieve better
+performance and recursion depth.
+
 ----
 
-Bonus for homogeneous data: `constexpr`
+Bonus for specific folds on homogeneous data: `constexpr`
 ```cpp
 template <typename F, typename State, typename T, std::size_t N>
-constexpr State foldl_impl(F f, State s, std::array<T, N> const& xs) {
+constexpr State
+homogeneous_foldl(F f, State s, std::array<T, N> const& xs) {
     for (std::size_t i = 0; i < xs.size(); ++i)
         s = f(s, xs[i]);
     return s;
 }
 
-template <template <typename ...> class f, typename state, typename ...xs>
-struct foldl_homogeneous {
-    TODO: FINISH THIS
-    TODO: will it work on arbitrary homogeneous data, or only integrals?
-};
+template <typename ...xs>
+using sum = std::integral_constant<
+    decltype(homogeneous_foldl(std::plus<>{}, 0, {xs::value...})),
+    homogeneous_foldl(std::plus<>{}, 0, {xs::value...})
+>;
 ```
 
 Note: We can't use a range-based for loop here because `std::array` does not
@@ -398,7 +520,13 @@ provide `constexpr` iterators.
 
 ----
 
-TODO: Expose benchmarks
+## Time
+![](plot/sum.deep/clang35.time.png)
+
+----
+
+## Memory usage
+![](plot/sum.deep/clang35.memusg.png)
 
 ====================
 
@@ -429,128 +557,342 @@ template <template <typename ...> class f>
 struct quote { ... };
 ```
 
-----
+====================
 
-TODO: Show usage example and how the code is made simpler.
+## And the list continues
+See https://github.com/ldionne/mpl11/tree/benchmarks
 
 ====================
 
-## Variadic sequences
+## The MPL is stuck with C++03
+## And we're stuck with the MPL <!-- .element: class="fragment" -->
 
 ====================
 
-## Error messages
-(still room for improvement)
-Note: Show the hell of faux variadics
-
-====================
-
-## Obscure implementation
-(yes that's a problem)
-Note:
-- A kitten dies each time a user sees the internals
-- People can't contribute
-- You're left with an unmaintainable mess
-
-====================
-
-## Preprocessing and parsing time
-Note: Here I mean the time penalty just for including the library.
-
-====================
-
-## At this point, it should be clear that we need a new MPL. What would it look like?
+## We need something new.
+## What would that look like?
 
 ==============================================================================
 
-# Considered solutions
+# Act 2
+## Towards a MPL successor
+
+<!--
+TODO: Perhaps show what's wrong with the current MPL, or simply list some
+stuff that should be improved in a MPL successor. Suggestions:
+- Error messages (e.g. hit on faux-variadics)
+- Obscure implementation
+    + A kitten dies each time a user sees the internals
+    + People can't contribute
+    + You're left with an unmaintainable mess
+    + Preprocessing and parsing time, i.e. the time penalty just
+      for including the library.
+-->
+
+====================
+
+## But before...
+## __What__ is metaprogramming in C++?
+<!-- .element: class="fragment" -->
+
+----
+
+## What is the purpose of the MPL?
+Note: State the scope of a MPL successor.
+
+----
+
+## of Fusion?
+
+====================
+
+## Orthogonal design aspects
+
+====================
+
+## Tagging system
+
+----
+
+Basic tags (current MPL)
+```cpp
+template <typename T>
+struct tag_of { using type = typename T::mpl_tag; };
+
+struct list_tag;
+
+template <typename ...xs>
+struct list { using mpl_tag = list_tag; };
+```
+
+----
+
+Datatypes
+```cpp
+template <typename T>
+struct datatype { using type = typename T::mpl_datatype; };
+
+struct List;
+
+template <typename ...xs>
+struct list { using mpl_datatype = List; };
+
+template <typename x, typename xs>
+struct cons { using mpl_datatype = List; };
+
+struct nil { using mpl_datatype = List; };
+```
+
 Note:
-This only sketches the "core" of the solution. With almost any of these
-solutions it would be possible to:
-- Use a typeclass-based dispatching mechanism
-- Have Datatypes or something equivalent
-- Interoperate easily with other libraries
+1. They are the same as basic tags, except for the fact that we're making
+explicit the fact that a datatype can have multiple constructors, which
+was not really advertised in the MPL.
+2. From now on, we'll be using datatypes instead of simple tags in
+the examples.
 
 ====================
 
-## Faithful reimplementation of MPL
-Note: (see old commits and talk about small variations e.g. on dispatching)
+## Metafunction dispatching
+
+----
+
+Per-metafunction dispatching
+```cpp
+template <typename Datatype> struct head_impl;
+
+template <> struct head_impl<List> {
+    template <typename> struct apply;
+
+    template <typename x, typename ...xs>
+    struct apply<list<x, xs...>> { using type = x; };
+
+    template <typename x, typename xs>
+    struct apply<cons<x, xs>> { using type = x; };
+};
+
+template <typename xs>
+using head = typename head_impl<typename datatype<xs>::type>::
+             template apply<xs>;
+
+// etc...
+```
+
+----
+
+Type classes (from Haskell)
+```cpp
+template <> struct Iterable<List> : defaults<Iterable> {
+    template <typename> struct head_impl;
+
+    template <typename x, typename ...xs>
+    struct head_impl<list<x, xs...>> { using type = x; };
+
+    template <typename x, typename xs>
+    struct head<cons<x, xs>> { using type = x; };
+
+    // Same for tail<> and is_empty<>
+};
+
+template <typename xs>
+using head = typename Iterable<typename datatype<xs>::type>::
+             template head_impl<xs>;
+
+// etc...
+```
+
+Note: Explain what is the minimal complete definition (m.c.d.).
+
+----
+
+Type classes (cont.)
+```cpp
+template <template <typename ...> class Typeclass>
+struct defaults;
+
+template <>
+struct defaults<Iterable> {
+    template <typename index, typename xs>
+    struct at_impl { ... };
+
+    template <typename index, typename xs>
+    struct last_impl { ... };
+
+    ...
+};
+```
+
+Note: Explain how default methods can be customized simply by implementing
+them in the `Iterable<List>` specialization.
 
 ====================
 
-## Homogeneous constexpr
-(just to clarify ideas and see why this is not a solution)
+## Some useful type classes
+(MPL11 type classes differ from Haskell's)
+
+----
+
+## Functor
+- `fmap<f, functor>` (m.c.d.)
+
+----
+
+## Foldable
+- `foldl<f, state, foldable>` (m.c.d.)
+- `foldr<f, state, foldable>` (m.c.d.)
+- `sum<foldable>`
+- `product<foldable>`
+- `{any,all,none}<predicate, foldable>`
+- `{maximum,minimum}<foldable>`
+- ...
+
+----
+
+## Iterable
+- `head<iterable>` (m.c.d.)
+- `tail<iterable>` (m.c.d.)
+- `is_empty<iterable>` (m.c.d.)
+- `at<index, iterable>`
+- `last<iterable>`
+- `drop<n, iterable>`
+- `drop_while<predicate, iterable>`
+- ...
+
+====================
+
+## Algorithm/sequence interaction
+
+----
+
+Iterators
+```cpp
+template <typename first, typename last>
+struct algorithm_impl {
+    // Use `next<>`, `deref<>`, `equal<>` and friends
+};
+
+template <typename sequence>
+using algorithm = algorithm_impl<
+    typename begin<sequence>::type,
+    typename end<sequence>::type
+>;
+```
+
+----
+
+Sequence-oriented type classes
+```cpp
+template <typename sequence>
+struct algorithm {
+    // Use appropriate type class methods.
+};
+```
+
+====================
+
+## Evaluation strategy
+
+----
+
+Strict with classic metafunctions (current MPL)
+```cpp
+template <typename x> struct inc { using type = int_<x::value + 1>; };
+
+using int_2 = inc<inc<int_<0>>::type>::type;
+```
+
+----
+
+Lazy with classic metafunctions
+```cpp
+template <typename x> struct inc : int_<x::type::value + 1> { };
+
+using int_2 = inc<inc<int_<0>>>::type;
+```
+
+Note:
+Dismiss the cynics about performance.
+
+Pros:
+
+- No `typename ::type`
+- Powerful in conjunction with e.g. `foldr`
+- Naive algorithm implementation has the same behavior as a MPL view
+- Allows composition of metafunctions even when there's an `if_`.
+
+Cons:
+
+- All arguments require a nested `::type`, which introduces boxed types.
+
+----
+
+Strict with new-style metafunctions
+```cpp
+template <typename X>
+constexpr auto f(X x) { return x; }
+```
+
+Note:
+Pros:
+
+- Unifies syntax
+- Replaces Fusion
+- Can handle non-constexpr
+
+Cons:
+
+- Can't handle some nasty types as-is (`void`, incomplete types, ...)
+
+====================
+
+## Considered designs
+
+<!--
+TODO: For each design, show a minimal MPL. Explain what are the criteria
+for qualifying as a minimal MPL. (Foldable, Functor, Iterable, if_)
+-->
+
+====================
+
+## Faithful MPL reimplementation
+- Tagging: Basic
+- Dispatching: Per-metafunction
+- Algorithms: Iterators
+- Evaluation: Strict + classic
+
+====================
+
+## Haskell-ish
+- Tagging: Datatypes
+- Dispatching: Type classes
+- Algorithms: Type classes
+- Evaluation: Lazy + classic
+
+Note: Explain and show rewrite rules.
 
 ====================
 
 ## Heterogeneous constexpr
-(sweet, perhaps for Fusion?)
-
-====================
-
-## Lazy metafunctions + no iterators
-
-====================
-
-## Other libraries
-(and why I'm not satisfied)
-
-----
-lib1
-----
-...
-----
-libN
-
-==============================================================================
-
-# Selected design
-
-====================
-
-## Laziness
-Note: dismiss cynics about performance
-
-====================
-
-## Typeclasses
-
-====================
-
-## Datatypes
-
-====================
-
-## Methods
-
-<!-- Is there more Haskell stuff? -->
-
-====================
-
-## Rewrite rules (?)
-
-====================
-
-## Interoperability with other libraries
-Note: Talk about the relation to typeclasses, easy ad-hoc polymorphism etc..
-
-====================
-
-## what I don't like about my proposal
-----
-boxed types
-----
-no parameterized data types (perhaps that's possible though)
+- Tagging: Datatypes
+- Dispatching: Type classes
+- Algorithms: Type classes
+- Evaluation: Strict + new-style
 
 ====================
 
 ## Roadmap
+
 ----
-GSOC
+
+## GSoC
+Note: Finish design space exploration during GSoC.
+
 ----
-Boost
+
+## Boost
+
 ----
-Standard C++ (?)
+
+## Standard C++ (?)
 
 ====================
 
