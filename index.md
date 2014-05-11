@@ -253,10 +253,12 @@ struct map<f, list<xs...>> {
 
 ----
 
+## Time
 ![](plot/fmap.deep/clang35.time.png)
 
 ----
 
+## Memory usage
 ![](plot/fmap.deep/clang35.memusg.png)
 
 ====================
