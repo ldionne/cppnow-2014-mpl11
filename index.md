@@ -801,20 +801,56 @@ struct algorithm {
 
 ----
 
-Strict with classic metafunctions (current MPL)
+Strict with classic metafunctions
 ```cpp
-template <typename x> struct inc { using type = int_<x::value + 1>; };
+template <typename n, typename xs>
+struct drop
+    : if_<
+        or_<
+            typename equal<n, int_<0>>::type,
+            typename is_empty<xs>::type
+        >,
+        xs,
+        typename drop<
+            typename minus<n, int_<1>>::type,
+            typename tail<xs>::type
+        >::type
+    >
+{ };
+```
 
-using int_2 = inc<inc<int_<0>>::type>::type;
+----
+
+<!-- TODO: Fade-in transition instead of rolldown. -->
+
+Strict with classic metafunctions (cont.)
+```cpp
+template <typename n, typename xs,
+    bool = or_<equal<n, int_<0>>, is_empty<xs>>::value>
+struct drop {
+    using type = xs;
+};
+
+template <typename n, typename xs>
+struct drop<n, xs, false>
+    : drop<
+        typename minus<n, int_<1>>::type,
+        typename tail<xs>::type
+    >
+{ };
 ```
 
 ----
 
 Lazy with classic metafunctions
 ```cpp
-template <typename x> struct inc : int_<x::type::value + 1> { };
-
-using int_2 = inc<inc<int_<0>>>::type;
+template <typename n, typename xs>
+struct drop
+    : if_<or_<equal<n, int_<0>>, is_empty<xs>>,
+        xs,
+        drop<minus<n, int_<1>>, tail<xs>>
+    >
+{ };
 ```
 
 Note:
@@ -835,8 +871,33 @@ Cons:
 
 Strict with new-style metafunctions
 ```cpp
-template <typename X>
-constexpr auto f(X x) { return x; }
+template <typename N, typename Xs>
+constexpr auto drop(N n, Xs xs) {
+    return if_(n == int_<0>{},
+        xs,
+        drop(n - int_<1>{}, tail(xs))
+    );
+}
+```
+
+----
+
+<!-- TODO: Fade-in instead of rolldown transition -->
+
+Strict with new-style metafunctions (cont.)
+```cpp
+template <typename N, typename Xs>
+constexpr auto drop_impl(N n, Xs xs, true_) { return xs; }
+
+template <typename N, typename Xs>
+constexpr auto drop(N n, Xs xs) {
+    return drop_impl(n, xs, n == int_<0>{} || is_empty(xs));
+}
+
+template <typename N, typename Xs>
+constexpr auto drop_impl(N n, Xs xs, false_) {
+    return drop(n - int_<1>{}, tail(xs));
+}
 ```
 
 Note:
@@ -849,6 +910,8 @@ Pros:
 Cons:
 
 - Can't handle some nasty types as-is (`void`, incomplete types, ...)
+- How do we handle conditionals? Perhaps they're not _that_ important
+  because we can use overload resolution instead?
 
 ====================
 
