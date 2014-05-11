@@ -124,7 +124,8 @@ struct and_<x, xs...>
 { };
 ```
 
-----
+<!--
+~~~~
 
 With `noexcept`
 ```cpp
@@ -139,7 +140,7 @@ using and_ = bool_<
 >;
 ```
 
-----
+~~~~
 
 With `constexpr`
 ```cpp
@@ -157,7 +158,7 @@ using and_ = bool_<
 >;
 ```
 
-----
+~~~~
 
 With overload resolution
 ```cpp
@@ -171,7 +172,7 @@ using and_ = decltype(pointers_only(
 ));
 ```
 
-----
+~~~~
 
 With partial specialization
 ```cpp
@@ -184,6 +185,7 @@ struct and_impl<std::integral_constant<T, true>...> : true_ { };
 template <typename ...xs>
 using and_ = and_impl<bool_<xs::value>...>;
 ```
+-->
 
 ----
 
@@ -201,12 +203,12 @@ using and_ = std::is_same<
 ----
 
 ## Time
-![](plot/logical_or/clang35.time.png)
+![](plot/logical_or/pres/clang35.time.png)
 
 ----
 
 ## Memory usage
-![](plot/logical_or/clang35.memusg.png)
+![](plot/logical_or/pres/clang35.memusg.png)
 
 ====================
 
@@ -280,9 +282,6 @@ In the following slides...
 template <typename x>
 struct no_decay { using type = x; };
 
-template <typename ...xs>
-struct inherit : xs... { };
-
 template <typename key, typename value>
 struct pair { };
 ```
@@ -313,6 +312,9 @@ using at_key = decltype(
 
 With multiple inheritance
 ```cpp
+template <typename ...xs>
+struct inherit : xs... { };
+
 template <typename key, typename value>
 static no_decay<value> lookup(pair<key, value>*);
 
@@ -368,7 +370,8 @@ struct at<0, x, xs...> {
 };
 ```
 
-----
+<!--
+~~~~
 
 Using multiple inheritance
 ```cpp
@@ -388,6 +391,7 @@ using at = decltype(lookup<index>(
     (index_map<std::index_sequence_for<xs...>, xs...>*)nullptr
 ));
 ```
+-->
 
 ----
 
@@ -411,7 +415,8 @@ using at = decltype(
 );
 ```
 
-----
+<!--
+~~~~
 
 Using multiple inheritance (v2)
 ```cpp
@@ -432,16 +437,17 @@ struct lookup<n, std::index_sequence<index...>, xs...>
 template <std::size_t n, typename ...xs>
 using at = lookup<n, std::index_sequence_for<xs...>, xs...>;
 ```
+-->
 
 ----
 
 ## Time
-![](plot/at_index.deep/clang35.time.png)
+![](plot/at_index.deep/pres/clang35.time.png)
 
 ----
 
 ## Memory usage
-![](plot/at_index.deep/clang35.memusg.png)
+![](plot/at_index.deep/pres/clang35.memusg.png)
 
 ====================
 
