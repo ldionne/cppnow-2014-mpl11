@@ -821,8 +821,6 @@ struct drop
 
 ----
 
-<!-- TODO: Fade-in transition instead of rolldown. -->
-
 Strict with classic metafunctions (cont.)
 ```cpp
 template <typename n, typename xs,
@@ -882,8 +880,6 @@ constexpr auto drop(N n, Xs xs) {
 
 ----
 
-<!-- TODO: Fade-in instead of rolldown transition -->
-
 Strict with new-style metafunctions (cont.)
 ```cpp
 template <typename N, typename Xs>
@@ -922,7 +918,7 @@ TODO: For each design, show a minimal MPL. Explain what are the criteria
 for qualifying as a minimal MPL. (Foldable, Functor, Iterable, if_)
 -->
 
-====================
+----
 
 ## Faithful MPL reimplementation
 - Tagging: Basic
@@ -930,9 +926,9 @@ for qualifying as a minimal MPL. (Foldable, Functor, Iterable, if_)
 - Algorithms: Iterators
 - Evaluation: Strict + classic
 
-====================
+----
 
-## Haskell-ish
+## Haskell-ish (MPL11)
 - Tagging: Datatypes
 - Dispatching: Type classes
 - Algorithms: Type classes
@@ -940,13 +936,127 @@ for qualifying as a minimal MPL. (Foldable, Functor, Iterable, if_)
 
 Note: Explain and show rewrite rules.
 
-====================
+----
 
 ## Heterogeneous constexpr
 - Tagging: Datatypes
 - Dispatching: Type classes
 - Algorithms: Type classes
 - Evaluation: Strict + new-style
+
+====================
+
+## Comparison
+
+====================
+
+## Metafunction mapping
+
+----
+
+## MPL
+```cpp
+using xs = vector<...>;
+using ys = transform<xs, f>::type;
+```
+
+----
+
+## MPL11
+```cpp
+using xs = list<...>;
+using ys = fmap<f, xs>;
+```
+
+----
+
+## Constexpr
+```cpp
+constexpr auto xs = list<...>{};
+constexpr auto ys = fmap(f, xs);
+```
+
+----
+
+## Time
+![](code/fmap/fmap.time.png)
+
+----
+
+## Memory usage
+![](code/fmap/fmap.memusg.png)
+
+====================
+
+## Left fold
+
+----
+
+## MPL
+```cpp
+using xs = vector<...>;
+using z = fold<xs, state, f>::type;
+```
+
+----
+
+## MPL11
+```cpp
+using xs = list<...>;
+using z = foldl<f, state, xs>;
+```
+
+----
+
+## Constexpr
+```cpp
+constexpr auto xs = list<...>{};
+constexpr auto ys = foldl(f, state, xs);
+```
+
+----
+
+## Time
+![](code/foldl/foldl.time.png)
+
+----
+
+## Memory usage
+![](code/foldl/foldl.memusg.png)
+
+====================
+
+## Including
+
+----
+
+<!-- TODO: Improve layout -->
+
+## GCC 4.9
+- MPL: 8.2 s
+- MPL11: 0.09 s
+- MPL11 (minified): 0.08 s
+
+----
+
+## GCC 4.9
+- MPL/MPL11: 91.11
+- MPL/minified: 102.49
+- MPL11/minified: 1.125
+
+----
+
+## Clang 3.5
+- MPL: 2.6816 s
+- MPL11: 0.0471 s
+- MPL11 (minified): 0.0418 s
+
+----
+
+## Clang 3.5
+- MPL/MPL11: 56.93
+- MPL/minified: 64.15
+- MPL11/minified: 1.13
 
 ====================
 

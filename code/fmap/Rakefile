@@ -1,0 +1,17 @@
+require_relative '../compiler'
+require_relative '../utility'
+
+
+implementations = Dir['*.cpp'].map { |file|
+  File.remove_ext(File.basename(file))
+}
+
+
+task :default => ['fmap']
+plot('fmap' => %w{dataset/constexpr dataset/mpl dataset/mpl11})
+
+implementations.each do |impl|
+  dataset(1..1000, "dataset/#{impl}" => ["#{impl}.cpp"], compiler:'clang35', include: ['~/code/mpl11/include', '~/code/mpl11-cppnow-2014/code']) do |n|
+    binding
+  end
+end
