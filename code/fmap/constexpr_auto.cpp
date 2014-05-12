@@ -5,7 +5,8 @@ template <typename X> struct f_ { };
 
 constexpr struct {
     template <typename X>
-    constexpr f_<X> operator()(X) const;
+    constexpr auto operator()(X) const
+    { return f_<X>{}; }
 } f{};
 
 template <int> struct x { };

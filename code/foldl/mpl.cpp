@@ -1,5 +1,10 @@
+<%
+    xs = (1..n).map { |i| "x<#{i}>" }
+    list = MPL::List.new(xs)
+%>
+
 #include <boost/mpl/fold.hpp>
-#include <boost/mpl/list.hpp>
+<%= list.includes %>
 
 
 struct f {
@@ -9,12 +14,9 @@ struct f {
 
 
 template <int> struct x;
-<% xs = (1..n).map { |i| "x<#{i}>" }.join(', ') %>
 
 struct state;
 
-using xs = boost::mpl::list<
-    <%= xs %>
->;
+using xs = <%= list %>;
 
 using go = boost::mpl::fold<xs, state, f>::type;

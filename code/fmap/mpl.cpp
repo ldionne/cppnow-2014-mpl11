@@ -8,7 +8,7 @@
 
 
 struct f {
-    template <typename X>
+    template <typename>
     struct apply { struct type; };
 };
 
