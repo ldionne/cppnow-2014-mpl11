@@ -922,26 +922,26 @@ constexpr auto ys = foldl(f, state, xs);
 
 <!-- TODO: Improve layout -->
 
-## GCC 4.9
+### GCC 4.9
 - MPL: 8.2 s
 - MPL11: 0.09 s
 - MPL11 (minified): 0.08 s
 
 ----
 
-## GCC 4.9 (% speedup over the MPL)
+### GCC 4.9 (% speedup over the MPL)
 - MPL11: 9 111 %
 - MPL11 (minified): 10 249 %
 
 ----
 
-## Clang 3.5
+### Clang 3.5
 - MPL: 2.6816 s
 - MPL11: 0.0471 s
 
 ----
 
-## Clang 3.5 (% speedup over the MPL)
+### Clang 3.5 (% speedup over the MPL)
 - MPL11: 5 693 %
 - MPL11 (minified): 6 415 %
 
