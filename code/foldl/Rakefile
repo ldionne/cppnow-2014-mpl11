@@ -8,7 +8,7 @@ implementations = Dir['*.cpp'].map { |file|
 
 
 task :default => ['foldl']
-plot('foldl' => %w{dataset/constexpr dataset/mpl dataset/mpl11 dataset/mpl11_naive})
+plot('foldl' => implementations.map(&'dataset/'.method(:+)))
 
 implementations.each do |impl|
   dataset(1..1000, "dataset/#{impl}" => ["#{impl}.cpp"], compiler:'clang35', include: ['~/code/mpl11/include', '~/code/mpl11-cppnow-2014/code']) do |n|

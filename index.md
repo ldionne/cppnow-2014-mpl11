@@ -99,119 +99,6 @@ setup in the MPL, only simpler.
 
 ====================
 
-## Logical operations
-(without short-circuiting)
-
-<!-- TEST CODE
-static_assert(and_<>::value, "");
-static_assert(!and_<false_>::value, "");
-static_assert(and_<true_>::value, "");
-static_assert(!and_<true_, false_>::value, "");
-static_assert(and_<true_, true_>::value, "");
-static_assert(!and_<true_, true_, true_, true_, true_, false_>::value, "");
--->
-
-----
-
-Naive
-```cpp
-template <typename ...xs>
-struct and_ : true_ { };
-
-template <typename x, typename ...xs>
-struct and_<x, xs...>
-    : std::conditional_t<x::value, and_<xs...>, x>
-{ };
-```
-
-<!--
-~~~~
-
-With `noexcept`
-```cpp
-void allow_expansion(...) noexcept;
-
-template <bool condition>
-struct noexcept_if { noexcept_if() noexcept(condition) { } };
-
-template <typename ...xs>
-using and_ = bool_<
-    noexcept(allow_expansion(noexcept_if<xs::value>{}...))
->;
-```
-
-~~~~
-
-With `constexpr`
-```cpp
-template <std::size_t N>
-constexpr bool and_impl(const bool (&array)[N]) {
-    for (bool elem: array)
-        if (!elem)
-            return false;
-    return true;
-}
-
-template <typename ...xs>
-using and_ = bool_<
-    and_impl<sizeof...(xs) + 1>({(bool)xs::value..., true})
->;
-```
-
-~~~~
-
-With overload resolution
-```cpp
-template <typename ...T> true_  pointers_only(T*...);
-template <typename ...T> false_ pointers_only(T...);
-                         true_  pointers_only();
-
-template <typename ...xs>
-using and_ = decltype(pointers_only(
-    std::conditional_t<xs::value, int*, int>{}...
-));
-```
-
-~~~~
-
-With partial specialization
-```cpp
-template <typename ...>
-struct and_impl : false_ { };
-
-template <typename ...T>
-struct and_impl<std::integral_constant<T, true>...> : true_ { };
-
-template <typename ...xs>
-using and_ = and_impl<bool_<xs::value>...>;
-```
--->
-
-----
-
-With `std::is_same`
-```cpp
-template <bool ...> struct bool_seq;
-
-template <typename ...xs>
-using and_ = std::is_same<
-    bool_seq<xs::value...>,
-    bool_seq<(xs::value, true)...>
->;
-```
-
-----
-
-## Time
-![](plot/logical_or/pres/clang35.time.png)
-
-----
-
-## Memory usage
-![](plot/logical_or/pres/clang35.memusg.png)
-
-====================
-
 ## Metafunction mapping
 
 <!-- TEST CODE
@@ -262,6 +149,56 @@ struct map<f, list<xs...>> {
 
 ## Memory usage
 ![](plot/fmap.deep/clang35.memusg.png)
+
+====================
+
+## Logical operations
+(without short-circuiting)
+
+<!-- TEST CODE
+static_assert(and_<>::value, "");
+static_assert(!and_<false_>::value, "");
+static_assert(and_<true_>::value, "");
+static_assert(!and_<true_, false_>::value, "");
+static_assert(and_<true_, true_>::value, "");
+static_assert(!and_<true_, true_, true_, true_, true_, false_>::value, "");
+-->
+
+----
+
+Naive
+```cpp
+template <typename ...xs>
+struct and_ : true_ { };
+
+template <typename x, typename ...xs>
+struct and_<x, xs...>
+    : std::conditional_t<x::value, and_<xs...>, x>
+{ };
+```
+
+----
+
+With `std::is_same`
+```cpp
+template <bool ...> struct bool_seq;
+
+template <typename ...xs>
+using and_ = std::is_same<
+    bool_seq<xs::value...>,
+    bool_seq<(xs::value, true)...>
+>;
+```
+
+----
+
+## Time
+![](plot/logical_or/pres/clang35.time.png)
+
+----
+
+## Memory usage
+![](plot/logical_or/pres/clang35.memusg.png)
 
 ====================
 
@@ -370,29 +307,6 @@ struct at<0, x, xs...> {
 };
 ```
 
-<!--
-~~~~
-
-Using multiple inheritance
-```cpp
-template <std::size_t index, typename value>
-no_decay<value> lookup(index_pair<index, value>*);
-
-template <typename indices, typename ...xs>
-struct index_map;
-
-template <std::size_t ...indices, typename ...xs>
-struct index_map<std::index_sequence<indices...>, xs...>
-    : index_pair<indices, xs>...
-{ };
-
-template <std::size_t index, typename ...xs>
-using at = decltype(lookup<index>(
-    (index_map<std::index_sequence_for<xs...>, xs...>*)nullptr
-));
-```
--->
-
 ----
 
 Using overload resolution
@@ -414,30 +328,6 @@ using at = decltype(
     )
 );
 ```
-
-<!--
-~~~~
-
-Using multiple inheritance (v2)
-```cpp
-template <std::size_t, std::size_t, typename x>
-struct select { };
-
-template <std::size_t n, typename x>
-struct select<n, n, x> { using type = x; };
-
-template <std::size_t n, typename indices, typename ...xs>
-struct lookup;
-
-template <std::size_t n, std::size_t ...index, typename ...xs>
-struct lookup<n, std::index_sequence<index...>, xs...>
-    : select<n, index, xs>...
-{ };
-
-template <std::size_t n, typename ...xs>
-using at = lookup<n, std::index_sequence_for<xs...>, xs...>;
-```
--->
 
 ----
 
@@ -1039,24 +929,21 @@ constexpr auto ys = foldl(f, state, xs);
 
 ----
 
-## GCC 4.9
-- MPL/MPL11: 91.11
-- MPL/minified: 102.49
-- MPL11/minified: 1.125
+## GCC 4.9 (% speedup over the MPL)
+- MPL11: 9 111 %
+- MPL11 (minified): 10 249 %
 
 ----
 
 ## Clang 3.5
 - MPL: 2.6816 s
 - MPL11: 0.0471 s
-- MPL11 (minified): 0.0418 s
 
 ----
 
-## Clang 3.5
-- MPL/MPL11: 56.93
-- MPL/minified: 64.15
-- MPL11/minified: 1.13
+## Clang 3.5 (% speedup over the MPL)
+- MPL11: 5 693 %
+- MPL11 (minified): 6 415 %
 
 ====================
 
@@ -1083,3 +970,121 @@ Note: Finish design space exploration during GSoC.
 http://ldionne.com <br>
 http://github.com/ldionne
 </span>
+
+====================
+
+## Bonus
+(more TMP hacks)
+
+====================
+
+## Logical and
+
+----
+
+With `noexcept`
+```cpp
+void allow_expansion(...) noexcept;
+
+template <bool condition>
+struct noexcept_if { noexcept_if() noexcept(condition) { } };
+
+template <typename ...xs>
+using and_ = bool_<
+    noexcept(allow_expansion(noexcept_if<xs::value>{}...))
+>;
+```
+
+----
+
+With `constexpr`
+```cpp
+template <std::size_t N>
+constexpr bool and_impl(const bool (&array)[N]) {
+    for (bool elem: array)
+        if (!elem)
+            return false;
+    return true;
+}
+
+template <typename ...xs>
+using and_ = bool_<
+    and_impl<sizeof...(xs) + 1>({(bool)xs::value..., true})
+>;
+```
+
+----
+
+With overload resolution
+```cpp
+template <typename ...T> true_  pointers_only(T*...);
+template <typename ...T> false_ pointers_only(T...);
+                         true_  pointers_only();
+
+template <typename ...xs>
+using and_ = decltype(pointers_only(
+    std::conditional_t<xs::value, int*, int>{}...
+));
+```
+
+----
+
+With partial specialization
+```cpp
+template <typename ...>
+struct and_impl : false_ { };
+
+template <typename ...T>
+struct and_impl<std::integral_constant<T, true>...> : true_ { };
+
+template <typename ...xs>
+using and_ = and_impl<bool_<xs::value>...>;
+```
+
+====================
+
+## Index-based lookup
+
+----
+
+Using multiple inheritance
+```cpp
+template <std::size_t index, typename value>
+no_decay<value> lookup(index_pair<index, value>*);
+
+template <typename indices, typename ...xs>
+struct index_map;
+
+template <std::size_t ...indices, typename ...xs>
+struct index_map<std::index_sequence<indices...>, xs...>
+    : index_pair<indices, xs>...
+{ };
+
+template <std::size_t index, typename ...xs>
+using at = decltype(lookup<index>(
+    (index_map<std::index_sequence_for<xs...>, xs...>*)nullptr
+));
+```
+
+----
+
+Using multiple inheritance (v2)
+```cpp
+template <std::size_t, std::size_t, typename x>
+struct select { };
+
+template <std::size_t n, typename x>
+struct select<n, n, x> { using type = x; };
+
+template <std::size_t n, typename indices, typename ...xs>
+struct lookup;
+
+template <std::size_t n, std::size_t ...index, typename ...xs>
+struct lookup<n, std::index_sequence<index...>, xs...>
+    : select<n, index, xs>...
+{ };
+
+template <std::size_t n, typename ...xs>
+using at = lookup<n, std::index_sequence_for<xs...>, xs...>;
+```
+
