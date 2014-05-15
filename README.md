@@ -1,9 +1,10 @@
-This repository contains my presentation for C++Now 2014.
+This repository contains my presentation for C++Now 2014. 
 
 The presentation is based on [reveal.js](https://github.com/hakimel/reveal.js).
 
 ## Basic usage
-Open index.html with your browser.
+Go to https://ldionne.github.io/mpl11-cppnow-2014 or open index.html with 
+your browser.
 
 ## Advanced usage
 ```sh
